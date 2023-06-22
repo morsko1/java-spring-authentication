@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,9 @@ public class JwtService {
   @Value("${application.security.jwtExpirationMs}")
   private int jwtExpirationMs;
 
+  @Value("${application.security.jwtCookieName}")
+  private String jwtCookieName;
+
   public String extractUsername(String token) {
     return extractClaim(token, Claims::getSubject);
   }
@@ -33,11 +37,17 @@ public class JwtService {
     return claimsResolver.apply(claims);
   }
 
-  public String generateToken(UserDetails userDetails) {
-    return generateToken(new HashMap<>(), userDetails);
+  public ResponseCookie generateCookie(UserDetails userDetails) {
+    String token = generateToken(new HashMap<>(), userDetails);
+    return ResponseCookie
+      .from(jwtCookieName, token)
+      .path("/api")
+      .maxAge(jwtExpirationMs)
+      .httpOnly(true)
+      .build();
   }
 
-  public String generateToken(
+  private String generateToken(
     Map<String, Object> extraClaims,
     UserDetails userDetails
   ) {
@@ -74,11 +84,11 @@ public class JwtService {
 
   private Claims extractAllClaims(String token) {
     return Jwts
-        .parserBuilder()
-        .setSigningKey(getSignInKey())
-        .build()
-        .parseClaimsJws(token)
-        .getBody();
+      .parserBuilder()
+      .setSigningKey(getSignInKey())
+      .build()
+      .parseClaimsJws(token)
+      .getBody();
   }
 
   private Key getSignInKey() {
